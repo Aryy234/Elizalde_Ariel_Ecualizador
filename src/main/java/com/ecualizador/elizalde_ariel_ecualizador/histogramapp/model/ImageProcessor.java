@@ -6,147 +6,177 @@ import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
 
+/**
+ * Contiene los algoritmos de procesamiento de imágenes.
+ * Cada operación crea y devuelve una imagen nueva para mantener intacta
+ * la imagen recibida como parámetro.
+ */
 public class ImageProcessor {
 
-    public Image convertToGrayscale(Image image) {
-        validateImage(image);
-        int width = (int) image.getWidth();
-        int height = (int) image.getHeight();
-        WritableImage result = new WritableImage(width, height);
-        PixelReader reader = image.getPixelReader();
-        PixelWriter writer = result.getPixelWriter();
+    /** Convierte una imagen a gris usando la fórmula de luminancia perceptual. */
+    public Image convertirAEscalaGrises(Image imagen) {
+        validarImagen(imagen);
+        int ancho = (int) imagen.getWidth();
+        int alto = (int) imagen.getHeight();
+        WritableImage resultado = new WritableImage(ancho, alto);
+        PixelReader lector = imagen.getPixelReader();
+        PixelWriter escritor = resultado.getPixelWriter();
 
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                Color color = reader.getColor(x, y);
-                double gray = 0.299 * color.getRed()
+        for (int y = 0; y < alto; y++) {
+            for (int x = 0; x < ancho; x++) {
+                Color color = lector.getColor(x, y);
+                double gris = 0.299 * color.getRed()
                         + 0.587 * color.getGreen()
                         + 0.114 * color.getBlue();
-                writer.setColor(x, y, new Color(gray, gray, gray, color.getOpacity()));
+
+                // Los tres canales reciben el mismo valor para producir gris.
+                escritor.setColor(x, y, new Color(gris, gris, gris, color.getOpacity()));
             }
         }
-        return result;
+        return resultado;
     }
 
-    public Image equalize(Image image) {
-        validateImage(image);
-        int width = (int) image.getWidth();
-        int height = (int) image.getHeight();
-        int totalPixels = width * height;
-        int[] histogram = calculateBrightnessHistogram(image);
+    /**
+     * Ecualiza el brillo sin eliminar los colores.
+     * Se conserva el tono y la saturación del modelo HSB, mientras el brillo
+     * se redistribuye mediante el histograma acumulado.
+     */
+    public Image ecualizar(Image imagen) {
+        validarImagen(imagen);
+        int ancho = (int) imagen.getWidth();
+        int alto = (int) imagen.getHeight();
+        int totalPixeles = ancho * alto;
+        int[] histograma = calcularHistogramaBrillo(imagen);
 
-        int[] cumulative = new int[256];
-        cumulative[0] = histogram[0];
-        for (int i = 1; i < cumulative.length; i++) {
-            cumulative[i] = cumulative[i - 1] + histogram[i];
+        // La posición i contiene la cantidad de píxeles entre 0 e i.
+        int[] acumulado = new int[256];
+        acumulado[0] = histograma[0];
+        for (int i = 1; i < acumulado.length; i++) {
+            acumulado[i] = acumulado[i - 1] + histograma[i];
         }
 
-        int firstNonZero = 0;
-        while (firstNonZero < 256 && histogram[firstNonZero] == 0) {
-            firstNonZero++;
-        }
-        if (firstNonZero == 256 || totalPixels == cumulative[firstNonZero]) {
-            return copyImage(image);
+        // Se busca la primera intensidad utilizada para normalizar desde cero.
+        int primerNivelUsado = 0;
+        while (primerNivelUsado < 256 && histograma[primerNivelUsado] == 0) {
+            primerNivelUsado++;
         }
 
-        PixelReader reader = image.getPixelReader();
-        WritableImage result = new WritableImage(width, height);
-        PixelWriter writer = result.getPixelWriter();
-        int minimumCumulative = cumulative[firstNonZero];
+        // Una imagen de un solo nivel no puede ampliar su contraste.
+        if (primerNivelUsado == 256 || totalPixeles == acumulado[primerNivelUsado]) {
+            return copiarImagen(imagen);
+        }
 
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                Color originalColor = reader.getColor(x, y);
-                int oldValue = (int) Math.round(originalColor.getBrightness() * 255);
-                double normalized = (double) (cumulative[oldValue] - minimumCumulative)
-                        / (totalPixels - minimumCumulative);
-                double newValue = Math.max(0, Math.min(1, normalized));
-                Color equalizedColor = Color.hsb(
-                        originalColor.getHue(),
-                        originalColor.getSaturation(),
-                        newValue,
-                        originalColor.getOpacity()
+        PixelReader lector = imagen.getPixelReader();
+        WritableImage resultado = new WritableImage(ancho, alto);
+        PixelWriter escritor = resultado.getPixelWriter();
+        int acumuladoMinimo = acumulado[primerNivelUsado];
+
+        for (int y = 0; y < alto; y++) {
+            for (int x = 0; x < ancho; x++) {
+                Color colorOriginal = lector.getColor(x, y);
+                int brilloAnterior = (int) Math.round(colorOriginal.getBrightness() * 255);
+
+                // Esta fórmula lleva la distribución acumulada al intervalo 0..1.
+                double brilloNuevo = (double) (acumulado[brilloAnterior] - acumuladoMinimo)
+                        / (totalPixeles - acumuladoMinimo);
+                brilloNuevo = limitarValorColor(brilloNuevo);
+
+                Color colorEcualizado = Color.hsb(
+                        colorOriginal.getHue(),
+                        colorOriginal.getSaturation(),
+                        brilloNuevo,
+                        colorOriginal.getOpacity()
                 );
-                writer.setColor(x, y, equalizedColor);
+                escritor.setColor(x, y, colorEcualizado);
             }
         }
-        return result;
+        return resultado;
     }
 
-    private int[] calculateBrightnessHistogram(Image image) {
-        int[] histogram = new int[256];
-        PixelReader reader = image.getPixelReader();
-        int width = (int) image.getWidth();
-        int height = (int) image.getHeight();
+    /** Construye el histograma del componente brillo utilizado al ecualizar. */
+    private int[] calcularHistogramaBrillo(Image imagen) {
+        int[] histograma = new int[256];
+        PixelReader lector = imagen.getPixelReader();
+        int ancho = (int) imagen.getWidth();
+        int alto = (int) imagen.getHeight();
 
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                int brightness = (int) Math.round(reader.getColor(x, y).getBrightness() * 255);
-                histogram[brightness]++;
+        for (int y = 0; y < alto; y++) {
+            for (int x = 0; x < ancho; x++) {
+                int brillo = (int) Math.round(lector.getColor(x, y).getBrightness() * 255);
+                histograma[brillo]++;
             }
         }
-        return histogram;
+        return histograma;
     }
 
-    public Image applyIntensitySlice(Image image, int minimum, int maximum, boolean inverted) {
-        validateImage(image);
-        if (minimum < 0 || maximum > 255 || minimum > maximum) {
+    /**
+     * Realiza un slice binario. Los píxeles dentro del rango inclusivo quedan
+     * blancos y los demás negros; invertir intercambia ambos resultados.
+     */
+    public Image aplicarSliceIntensidad(Image imagen, int minimo, int maximo, boolean invertir) {
+        validarImagen(imagen);
+        if (minimo < 0 || maximo > 255 || minimo > maximo) {
             throw new IllegalArgumentException("El rango debe estar entre 0 y 255.");
         }
 
-        Image grayImage = convertToGrayscale(image);
-        int width = (int) grayImage.getWidth();
-        int height = (int) grayImage.getHeight();
-        PixelReader reader = grayImage.getPixelReader();
-        WritableImage result = new WritableImage(width, height);
-        PixelWriter writer = result.getPixelWriter();
+        Image imagenGris = convertirAEscalaGrises(imagen);
+        int ancho = (int) imagenGris.getWidth();
+        int alto = (int) imagenGris.getHeight();
+        PixelReader lector = imagenGris.getPixelReader();
+        WritableImage resultado = new WritableImage(ancho, alto);
+        PixelWriter escritor = resultado.getPixelWriter();
 
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                int intensity = (int) Math.round(reader.getColor(x, y).getRed() * 255);
-                boolean insideRange = intensity >= minimum && intensity <= maximum;
-                boolean whitePixel = inverted ? !insideRange : insideRange;
-                writer.setColor(x, y, whitePixel ? Color.WHITE : Color.BLACK);
+        for (int y = 0; y < alto; y++) {
+            for (int x = 0; x < ancho; x++) {
+                int intensidad = (int) Math.round(lector.getColor(x, y).getRed() * 255);
+                boolean estaEnRango = intensidad >= minimo && intensidad <= maximo;
+                boolean debeSerBlanco = invertir ? !estaEnRango : estaEnRango;
+                escritor.setColor(x, y, debeSerBlanco ? Color.WHITE : Color.BLACK);
             }
         }
-        return result;
+        return resultado;
     }
 
-    public Image adjustBrightness(Image image, int amount) {
-        validateImage(image);
-        if (amount < -100 || amount > 100) {
+    /**
+     * Suma una cantidad a los tres canales RGB. Un valor positivo aclara y uno
+     * negativo oscurece. Los valores se limitan al intervalo válido 0..1.
+     */
+    public Image ajustarBrillo(Image imagen, int cantidad) {
+        validarImagen(imagen);
+        if (cantidad < -100 || cantidad > 100) {
             throw new IllegalArgumentException("El brillo debe estar entre -100 y 100.");
         }
 
-        int width = (int) image.getWidth();
-        int height = (int) image.getHeight();
-        PixelReader reader = image.getPixelReader();
-        WritableImage result = new WritableImage(width, height);
-        PixelWriter writer = result.getPixelWriter();
-        double change = amount / 100.0;
+        int ancho = (int) imagen.getWidth();
+        int alto = (int) imagen.getHeight();
+        PixelReader lector = imagen.getPixelReader();
+        WritableImage resultado = new WritableImage(ancho, alto);
+        PixelWriter escritor = resultado.getPixelWriter();
+        double cambio = cantidad / 100.0;
 
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                Color color = reader.getColor(x, y);
-                double red = limitColor(color.getRed() + change);
-                double green = limitColor(color.getGreen() + change);
-                double blue = limitColor(color.getBlue() + change);
-                writer.setColor(x, y, new Color(red, green, blue, color.getOpacity()));
+        for (int y = 0; y < alto; y++) {
+            for (int x = 0; x < ancho; x++) {
+                Color color = lector.getColor(x, y);
+                double rojo = limitarValorColor(color.getRed() + cambio);
+                double verde = limitarValorColor(color.getGreen() + cambio);
+                double azul = limitarValorColor(color.getBlue() + cambio);
+                escritor.setColor(x, y, new Color(rojo, verde, azul, color.getOpacity()));
             }
         }
-        return result;
+        return resultado;
     }
 
-    private double limitColor(double value) {
-        return Math.max(0, Math.min(1, value));
+    private double limitarValorColor(double valor) {
+        return Math.max(0, Math.min(1, valor));
     }
 
-    private Image copyImage(Image image) {
-        return new WritableImage(image.getPixelReader(), (int) image.getWidth(), (int) image.getHeight());
+    private Image copiarImagen(Image imagen) {
+        return new WritableImage(
+                imagen.getPixelReader(), (int) imagen.getWidth(), (int) imagen.getHeight());
     }
 
-    private void validateImage(Image image) {
-        if (image == null || image.isError() || image.getPixelReader() == null) {
+    private void validarImagen(Image imagen) {
+        if (imagen == null || imagen.isError() || imagen.getPixelReader() == null) {
             throw new IllegalArgumentException("La imagen no es válida.");
         }
     }

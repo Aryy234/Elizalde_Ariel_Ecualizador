@@ -10,69 +10,69 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 class ImageProcessorTest {
 
-    private final ImageProcessor processor = new ImageProcessor();
+    private final ImageProcessor procesador = new ImageProcessor();
 
     @Test
-    void grayscaleCreatesANewImageWithEqualColorChannels() {
-        WritableImage source = oneRow(Color.RED, Color.BLUE);
+    void escalaGrisesCreaImagenNuevaConCanalesIguales() {
+        WritableImage origen = crearFila(Color.RED, Color.BLUE);
 
-        Image result = processor.convertToGrayscale(source);
-        Color pixel = result.getPixelReader().getColor(0, 0);
+        Image resultado = procesador.convertirAEscalaGrises(origen);
+        Color pixel = resultado.getPixelReader().getColor(0, 0);
 
-        assertNotSame(source, result);
+        assertNotSame(origen, resultado);
         assertEquals(pixel.getRed(), pixel.getGreen(), 0.001);
         assertEquals(pixel.getGreen(), pixel.getBlue(), 0.001);
     }
 
     @Test
-    void sliceMakesSelectedRangeWhiteAndOtherPixelsBlack() {
-        WritableImage source = oneRow(Color.gray(0.25), Color.gray(0.75));
+    void sliceVuelveBlancoElRangoSeleccionadoYNegroElResto() {
+        WritableImage origen = crearFila(Color.gray(0.25), Color.gray(0.75));
 
-        Image result = processor.applyIntensitySlice(source, 0, 127, false);
+        Image resultado = procesador.aplicarSliceIntensidad(origen, 0, 127, false);
 
-        assertEquals(Color.WHITE, result.getPixelReader().getColor(0, 0));
-        assertEquals(Color.BLACK, result.getPixelReader().getColor(1, 0));
+        assertEquals(Color.WHITE, resultado.getPixelReader().getColor(0, 0));
+        assertEquals(Color.BLACK, resultado.getPixelReader().getColor(1, 0));
     }
 
     @Test
-    void invertedSliceSwapsBlackAndWhite() {
-        WritableImage source = oneRow(Color.gray(0.25), Color.gray(0.75));
+    void sliceInvertidoIntercambiaNegroYBlanco() {
+        WritableImage origen = crearFila(Color.gray(0.25), Color.gray(0.75));
 
-        Image result = processor.applyIntensitySlice(source, 0, 127, true);
+        Image resultado = procesador.aplicarSliceIntensidad(origen, 0, 127, true);
 
-        assertEquals(Color.BLACK, result.getPixelReader().getColor(0, 0));
-        assertEquals(Color.WHITE, result.getPixelReader().getColor(1, 0));
+        assertEquals(Color.BLACK, resultado.getPixelReader().getColor(0, 0));
+        assertEquals(Color.WHITE, resultado.getPixelReader().getColor(1, 0));
     }
 
     @Test
-    void equalizationSpreadsTwoUsedIntensitiesToBlackAndWhite() {
-        WritableImage source = oneRow(Color.gray(0.2), Color.gray(0.4));
+    void ecualizacionExtiendeDosIntensidadesHastaNegroYBlanco() {
+        WritableImage origen = crearFila(Color.gray(0.2), Color.gray(0.4));
 
-        Image result = processor.equalize(source);
+        Image resultado = procesador.ecualizar(origen);
 
-        assertEquals(0.0, result.getPixelReader().getColor(0, 0).getRed(), 0.01);
-        assertEquals(1.0, result.getPixelReader().getColor(1, 0).getRed(), 0.01);
+        assertEquals(0.0, resultado.getPixelReader().getColor(0, 0).getRed(), 0.01);
+        assertEquals(1.0, resultado.getPixelReader().getColor(1, 0).getRed(), 0.01);
     }
 
     @Test
-    void equalizationPreservesHueAndSaturationOfColorPixels() {
-        Color darkRed = Color.hsb(0, 0.8, 0.2);
-        Color lightBlue = Color.hsb(220, 0.7, 0.6);
-        WritableImage source = oneRow(darkRed, lightBlue);
+    void ecualizacionConservaTonoYSaturacion() {
+        Color rojoOscuro = Color.hsb(0, 0.8, 0.2);
+        Color azulClaro = Color.hsb(220, 0.7, 0.6);
+        WritableImage origen = crearFila(rojoOscuro, azulClaro);
 
-        Image result = processor.equalize(source);
-        Color resultBlue = result.getPixelReader().getColor(1, 0);
+        Image resultado = procesador.ecualizar(origen);
+        Color azulResultado = resultado.getPixelReader().getColor(1, 0);
 
-        assertEquals(lightBlue.getHue(), resultBlue.getHue(), 0.5);
-        assertEquals(lightBlue.getSaturation(), resultBlue.getSaturation(), 0.01);
+        assertEquals(azulClaro.getHue(), azulResultado.getHue(), 0.5);
+        assertEquals(azulClaro.getSaturation(), azulResultado.getSaturation(), 0.01);
     }
 
     @Test
-    void positiveBrightnessMakesAnImageLighterAndPreservesColorDifferences() {
-        WritableImage source = oneRow(Color.color(0.1, 0.2, 0.3), Color.BLACK);
+    void brilloPositivoAclaraYConservaDiferenciasDeColor() {
+        WritableImage origen = crearFila(Color.color(0.1, 0.2, 0.3), Color.BLACK);
 
-        Image result = processor.adjustBrightness(source, 30);
-        Color pixel = result.getPixelReader().getColor(0, 0);
+        Image resultado = procesador.ajustarBrillo(origen, 30);
+        Color pixel = resultado.getPixelReader().getColor(0, 0);
 
         assertEquals(0.4, pixel.getRed(), 0.01);
         assertEquals(0.5, pixel.getGreen(), 0.01);
@@ -80,20 +80,20 @@ class ImageProcessorTest {
     }
 
     @Test
-    void brightnessIsLimitedToTheValidColorRange() {
-        WritableImage source = oneRow(Color.gray(0.9), Color.gray(0.1));
+    void brilloSeLimitaAlRangoValido() {
+        WritableImage origen = crearFila(Color.gray(0.9), Color.gray(0.1));
 
-        Image lighter = processor.adjustBrightness(source, 50);
-        Image darker = processor.adjustBrightness(source, -50);
+        Image masClara = procesador.ajustarBrillo(origen, 50);
+        Image masOscura = procesador.ajustarBrillo(origen, -50);
 
-        assertEquals(1.0, lighter.getPixelReader().getColor(0, 0).getRed(), 0.01);
-        assertEquals(0.0, darker.getPixelReader().getColor(1, 0).getRed(), 0.01);
+        assertEquals(1.0, masClara.getPixelReader().getColor(0, 0).getRed(), 0.01);
+        assertEquals(0.0, masOscura.getPixelReader().getColor(1, 0).getRed(), 0.01);
     }
 
-    private WritableImage oneRow(Color first, Color second) {
-        WritableImage image = new WritableImage(2, 1);
-        image.getPixelWriter().setColor(0, 0, first);
-        image.getPixelWriter().setColor(1, 0, second);
-        return image;
+    private WritableImage crearFila(Color primero, Color segundo) {
+        WritableImage imagen = new WritableImage(2, 1);
+        imagen.getPixelWriter().setColor(0, 0, primero);
+        imagen.getPixelWriter().setColor(1, 0, segundo);
+        return imagen;
     }
 }

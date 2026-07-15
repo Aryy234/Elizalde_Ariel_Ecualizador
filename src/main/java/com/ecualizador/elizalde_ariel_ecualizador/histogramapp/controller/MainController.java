@@ -19,213 +19,221 @@ import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
 
+/**
+ * Conecta la interfaz FXML con los algoritmos del modelo.
+ * Conserva tres imágenes separadas: la original, una copia gris utilizada por
+ * el slice y el último resultado procesado que puede mostrarse o guardarse.
+ */
 public class MainController {
 
-    @FXML private ImageView imageView;
-    @FXML private Label viewLabel;
-    @FXML private Label minimumValueLabel;
-    @FXML private Label maximumValueLabel;
-    @FXML private Label brightnessValueLabel;
-    @FXML private Slider minimumSlider;
-    @FXML private Slider maximumSlider;
-    @FXML private Slider brightnessSlider;
-    @FXML private CheckBox invertedCheckBox;
-    @FXML private Button saveButton;
-    @FXML private Button restoreButton;
-    @FXML private Button grayscaleButton;
-    @FXML private Button equalizeButton;
-    @FXML private Button brightnessButton;
-    @FXML private Button sliceButton;
-    @FXML private Button toggleViewButton;
-    @FXML private AreaChart<Number, Number> originalHistogramChart;
-    @FXML private AreaChart<Number, Number> processedHistogramChart;
+    @FXML private ImageView vistaImagen;
+    @FXML private Label etiquetaVista;
+    @FXML private Label etiquetaValorMinimo;
+    @FXML private Label etiquetaValorMaximo;
+    @FXML private Label etiquetaValorBrillo;
+    @FXML private Slider deslizadorMinimo;
+    @FXML private Slider deslizadorMaximo;
+    @FXML private Slider deslizadorBrillo;
+    @FXML private CheckBox casillaInvertir;
+    @FXML private Button botonGuardar;
+    @FXML private Button botonRestaurar;
+    @FXML private Button botonEscalaGrises;
+    @FXML private Button botonEcualizar;
+    @FXML private Button botonBrillo;
+    @FXML private Button botonSlice;
+    @FXML private Button botonAlternarVista;
+    @FXML private AreaChart<Number, Number> graficoHistogramaOriginal;
+    @FXML private AreaChart<Number, Number> graficoHistogramaProcesado;
 
-    private final ImageProcessor imageProcessor = new ImageProcessor();
-    private final HistogramAnalyzer histogramAnalyzer = new HistogramAnalyzer();
+    private final ImageProcessor procesadorImagen = new ImageProcessor();
+    private final HistogramAnalyzer analizadorHistograma = new HistogramAnalyzer();
 
-    private Image originalImage;
-    private Image grayscaleImage;
-    private Image processedImage;
-    private boolean showingOriginal = true;
+    private Image imagenOriginal;
+    private Image imagenGris;
+    private Image imagenProcesada;
+    private boolean mostrandoOriginal = true;
 
     @FXML
     private void initialize() {
-        minimumSlider.valueProperty().addListener((observable, oldValue, newValue) -> {
-            if (newValue.doubleValue() > maximumSlider.getValue()) {
-                minimumSlider.setValue(maximumSlider.getValue());
+        // Los listeners impiden que el límite mínimo supere al máximo.
+        deslizadorMinimo.valueProperty().addListener((observable, valorAnterior, valorNuevo) -> {
+            if (valorNuevo.doubleValue() > deslizadorMaximo.getValue()) {
+                deslizadorMinimo.setValue(deslizadorMaximo.getValue());
             }
-            updateSliderLabels();
+            actualizarEtiquetasRango();
         });
-        maximumSlider.valueProperty().addListener((observable, oldValue, newValue) -> {
-            if (newValue.doubleValue() < minimumSlider.getValue()) {
-                maximumSlider.setValue(minimumSlider.getValue());
+        deslizadorMaximo.valueProperty().addListener((observable, valorAnterior, valorNuevo) -> {
+            if (valorNuevo.doubleValue() < deslizadorMinimo.getValue()) {
+                deslizadorMaximo.setValue(deslizadorMinimo.getValue());
             }
-            updateSliderLabels();
+            actualizarEtiquetasRango();
         });
-        brightnessSlider.valueProperty().addListener((observable, oldValue, newValue) ->
-                updateBrightnessLabel());
-        updateSliderLabels();
-        updateBrightnessLabel();
-        setControlsDisabled(true);
-        configureChart(originalHistogramChart);
-        configureChart(processedHistogramChart);
+        deslizadorBrillo.valueProperty().addListener((observable, valorAnterior, valorNuevo) ->
+                actualizarEtiquetaBrillo());
+        actualizarEtiquetasRango();
+        actualizarEtiquetaBrillo();
+        deshabilitarControles(true);
+        configurarGrafico(graficoHistogramaOriginal);
+        configurarGrafico(graficoHistogramaProcesado);
     }
 
     @FXML
-    private void loadImage() {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Seleccionar imagen");
-        chooser.getExtensionFilters().add(
+    private void cargarImagen() {
+        FileChooser selector = new FileChooser();
+        selector.setTitle("Seleccionar imagen");
+        selector.getExtensionFilters().add(
                 new FileChooser.ExtensionFilter("Imágenes", "*.png", "*.jpg", "*.jpeg")
         );
-        File file = chooser.showOpenDialog(imageView.getScene().getWindow());
-        if (file == null) {
+        File archivo = selector.showOpenDialog(vistaImagen.getScene().getWindow());
+        if (archivo == null) {
             return;
         }
 
         try {
-            Image loadedImage = new Image(file.toURI().toString(), false);
-            if (loadedImage.isError() || loadedImage.getPixelReader() == null) {
+            Image imagenCargada = new Image(archivo.toURI().toString(), false);
+            if (imagenCargada.isError() || imagenCargada.getPixelReader() == null) {
                 throw new IllegalArgumentException("El archivo no contiene una imagen válida.");
             }
-            originalImage = loadedImage;
-            grayscaleImage = imageProcessor.convertToGrayscale(originalImage);
-            processedImage = grayscaleImage;
-            brightnessSlider.setValue(0);
-            showingOriginal = true;
-            updateImageView();
-            updateHistogram(originalHistogramChart, grayscaleImage);
-            updateHistogram(processedHistogramChart, processedImage);
-            setControlsDisabled(false);
-        } catch (RuntimeException exception) {
-            showError("No se pudo abrir la imagen", exception.getMessage());
+            imagenOriginal = imagenCargada;
+            imagenGris = procesadorImagen.convertirAEscalaGrises(imagenOriginal);
+            imagenProcesada = imagenGris;
+            deslizadorBrillo.setValue(0);
+            mostrandoOriginal = true;
+            actualizarVistaImagen();
+            actualizarHistograma(graficoHistogramaOriginal, imagenGris);
+            actualizarHistograma(graficoHistogramaProcesado, imagenProcesada);
+            deshabilitarControles(false);
+        } catch (RuntimeException excepcion) {
+            mostrarError("No se pudo abrir la imagen", excepcion.getMessage());
         }
     }
 
     @FXML
-    private void convertToGrayscale() {
-        processedImage = imageProcessor.convertToGrayscale(originalImage);
-        showProcessedResult();
+    private void convertirAEscalaGrises() {
+        imagenProcesada = procesadorImagen.convertirAEscalaGrises(imagenOriginal);
+        mostrarResultadoProcesado();
     }
 
     @FXML
-    private void equalizeImage() {
-        processedImage = imageProcessor.equalize(originalImage);
-        showProcessedResult();
+    private void ecualizarImagen() {
+        imagenProcesada = procesadorImagen.ecualizar(imagenOriginal);
+        mostrarResultadoProcesado();
     }
 
     @FXML
-    private void adjustBrightness() {
-        int amount = (int) Math.round(brightnessSlider.getValue());
-        processedImage = imageProcessor.adjustBrightness(originalImage, amount);
-        showProcessedResult();
+    private void ajustarBrillo() {
+        int cantidad = (int) Math.round(deslizadorBrillo.getValue());
+        imagenProcesada = procesadorImagen.ajustarBrillo(imagenOriginal, cantidad);
+        mostrarResultadoProcesado();
     }
 
     @FXML
-    private void applySlice() {
-        int minimum = (int) Math.round(minimumSlider.getValue());
-        int maximum = (int) Math.round(maximumSlider.getValue());
-        processedImage = imageProcessor.applyIntensitySlice(
-                grayscaleImage, minimum, maximum, invertedCheckBox.isSelected());
-        showProcessedResult();
+    private void aplicarSlice() {
+        int minimo = (int) Math.round(deslizadorMinimo.getValue());
+        int maximo = (int) Math.round(deslizadorMaximo.getValue());
+        imagenProcesada = procesadorImagen.aplicarSliceIntensidad(
+                imagenGris, minimo, maximo, casillaInvertir.isSelected());
+        mostrarResultadoProcesado();
     }
 
     @FXML
-    private void restoreImage() {
-        processedImage = grayscaleImage;
-        brightnessSlider.setValue(0);
-        showingOriginal = true;
-        updateImageView();
-        updateHistogram(processedHistogramChart, processedImage);
+    private void restaurarImagen() {
+        imagenProcesada = imagenGris;
+        deslizadorBrillo.setValue(0);
+        mostrandoOriginal = true;
+        actualizarVistaImagen();
+        actualizarHistograma(graficoHistogramaProcesado, imagenProcesada);
     }
 
     @FXML
-    private void toggleView() {
-        showingOriginal = !showingOriginal;
-        updateImageView();
+    private void alternarVista() {
+        mostrandoOriginal = !mostrandoOriginal;
+        actualizarVistaImagen();
     }
 
     @FXML
-    private void saveImage() {
-        if (processedImage == null) {
+    private void guardarImagen() {
+        if (imagenProcesada == null) {
             return;
         }
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Guardar imagen procesada");
-        chooser.setInitialFileName("imagen-procesada.png");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG", "*.png"));
-        File file = chooser.showSaveDialog(imageView.getScene().getWindow());
-        if (file == null) {
+        FileChooser selector = new FileChooser();
+        selector.setTitle("Guardar imagen procesada");
+        selector.setInitialFileName("imagen-procesada.png");
+        selector.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG", "*.png"));
+        File archivo = selector.showSaveDialog(vistaImagen.getScene().getWindow());
+        if (archivo == null) {
             return;
         }
-        if (!file.getName().toLowerCase().endsWith(".png")) {
-            file = new File(file.getAbsolutePath() + ".png");
+        if (!archivo.getName().toLowerCase().endsWith(".png")) {
+            archivo = new File(archivo.getAbsolutePath() + ".png");
         }
 
         try {
-            ImageIO.write(SwingFXUtils.fromFXImage(processedImage, null), "png", file);
-        } catch (IOException exception) {
-            showError("No se pudo guardar la imagen", exception.getMessage());
+            ImageIO.write(SwingFXUtils.fromFXImage(imagenProcesada, null), "png", archivo);
+        } catch (IOException excepcion) {
+            mostrarError("No se pudo guardar la imagen", excepcion.getMessage());
         }
     }
 
-    private void showProcessedResult() {
-        showingOriginal = false;
-        updateImageView();
-        updateHistogram(processedHistogramChart, processedImage);
+    private void mostrarResultadoProcesado() {
+        // Cada operación cambia automáticamente a la vista del resultado.
+        mostrandoOriginal = false;
+        actualizarVistaImagen();
+        actualizarHistograma(graficoHistogramaProcesado, imagenProcesada);
     }
 
-    private void updateImageView() {
-        imageView.setImage(showingOriginal ? originalImage : processedImage);
-        viewLabel.setText(showingOriginal ? "Vista: imagen original" : "Vista: imagen procesada");
-        toggleViewButton.setText(showingOriginal ? "Ver procesada" : "Ver original");
+    private void actualizarVistaImagen() {
+        vistaImagen.setImage(mostrandoOriginal ? imagenOriginal : imagenProcesada);
+        etiquetaVista.setText(mostrandoOriginal ? "Vista: imagen original" : "Vista: imagen procesada");
+        botonAlternarVista.setText(mostrandoOriginal ? "Ver procesada" : "Ver original");
     }
 
-    private void updateHistogram(AreaChart<Number, Number> chart, Image image) {
-        int[] histogram = histogramAnalyzer.calculateHistogram(image);
-        XYChart.Series<Number, Number> series = new XYChart.Series<>();
-        for (int intensity = 0; intensity < histogram.length; intensity++) {
-            series.getData().add(new XYChart.Data<>(intensity, histogram[intensity]));
+    private void actualizarHistograma(AreaChart<Number, Number> grafico, Image imagen) {
+        // Cada dato usa la intensidad en X y la cantidad de píxeles en Y.
+        int[] histograma = analizadorHistograma.calcularHistograma(imagen);
+        XYChart.Series<Number, Number> serie = new XYChart.Series<>();
+        for (int intensidad = 0; intensidad < histograma.length; intensidad++) {
+            serie.getData().add(new XYChart.Data<>(intensidad, histograma[intensidad]));
         }
-        chart.getData().clear();
-        chart.getData().add(series);
+        grafico.getData().clear();
+        grafico.getData().add(serie);
     }
 
-    private void configureChart(AreaChart<Number, Number> chart) {
-        chart.setAnimated(false);
-        chart.setLegendVisible(false);
-        chart.setCreateSymbols(false);
+    private void configurarGrafico(AreaChart<Number, Number> grafico) {
+        grafico.setAnimated(false);
+        grafico.setLegendVisible(false);
+        grafico.setCreateSymbols(false);
     }
 
-    private void updateSliderLabels() {
-        minimumValueLabel.setText(String.valueOf((int) Math.round(minimumSlider.getValue())));
-        maximumValueLabel.setText(String.valueOf((int) Math.round(maximumSlider.getValue())));
+    private void actualizarEtiquetasRango() {
+        etiquetaValorMinimo.setText(String.valueOf((int) Math.round(deslizadorMinimo.getValue())));
+        etiquetaValorMaximo.setText(String.valueOf((int) Math.round(deslizadorMaximo.getValue())));
     }
 
-    private void updateBrightnessLabel() {
-        int value = (int) Math.round(brightnessSlider.getValue());
-        brightnessValueLabel.setText(value > 0 ? "+" + value : String.valueOf(value));
+    private void actualizarEtiquetaBrillo() {
+        int valor = (int) Math.round(deslizadorBrillo.getValue());
+        etiquetaValorBrillo.setText(valor > 0 ? "+" + valor : String.valueOf(valor));
     }
 
-    private void setControlsDisabled(boolean disabled) {
-        saveButton.setDisable(disabled);
-        restoreButton.setDisable(disabled);
-        grayscaleButton.setDisable(disabled);
-        equalizeButton.setDisable(disabled);
-        brightnessButton.setDisable(disabled);
-        sliceButton.setDisable(disabled);
-        toggleViewButton.setDisable(disabled);
-        minimumSlider.setDisable(disabled);
-        maximumSlider.setDisable(disabled);
-        brightnessSlider.setDisable(disabled);
-        invertedCheckBox.setDisable(disabled);
+    private void deshabilitarControles(boolean deshabilitados) {
+        botonGuardar.setDisable(deshabilitados);
+        botonRestaurar.setDisable(deshabilitados);
+        botonEscalaGrises.setDisable(deshabilitados);
+        botonEcualizar.setDisable(deshabilitados);
+        botonBrillo.setDisable(deshabilitados);
+        botonSlice.setDisable(deshabilitados);
+        botonAlternarVista.setDisable(deshabilitados);
+        deslizadorMinimo.setDisable(deshabilitados);
+        deslizadorMaximo.setDisable(deshabilitados);
+        deslizadorBrillo.setDisable(deshabilitados);
+        casillaInvertir.setDisable(deshabilitados);
     }
 
-    private void showError(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Error");
-        alert.setHeaderText(title);
-        alert.setContentText(message == null ? "Ocurrió un error inesperado." : message);
-        alert.showAndWait();
+    private void mostrarError(String titulo, String mensaje) {
+        Alert alerta = new Alert(Alert.AlertType.ERROR);
+        alerta.setTitle("Error");
+        alerta.setHeaderText(titulo);
+        alerta.setContentText(mensaje == null ? "Ocurrió un error inesperado." : mensaje);
+        alerta.showAndWait();
     }
 }

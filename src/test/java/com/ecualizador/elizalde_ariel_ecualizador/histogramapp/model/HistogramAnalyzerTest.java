@@ -9,22 +9,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class HistogramAnalyzerTest {
 
     @Test
-    void histogramHas256LevelsAndCountsEveryPixel() {
-        WritableImage image = new WritableImage(2, 2);
-        image.getPixelWriter().setColor(0, 0, Color.BLACK);
-        image.getPixelWriter().setColor(1, 0, Color.WHITE);
-        image.getPixelWriter().setColor(0, 1, Color.BLACK);
-        image.getPixelWriter().setColor(1, 1, Color.gray(0.5));
+    void elHistogramaTiene256NivelesYCuentaTodosLosPixeles() {
+        WritableImage imagen = new WritableImage(2, 2);
+        imagen.getPixelWriter().setColor(0, 0, Color.BLACK);
+        imagen.getPixelWriter().setColor(1, 0, Color.WHITE);
+        imagen.getPixelWriter().setColor(0, 1, Color.BLACK);
+        imagen.getPixelWriter().setColor(1, 1, Color.gray(0.5));
 
-        int[] histogram = new HistogramAnalyzer().calculateHistogram(image);
+        int[] histograma = new HistogramAnalyzer().calcularHistograma(imagen);
         int total = 0;
-        for (int count : histogram) {
-            total += count;
+        for (int cantidad : histograma) {
+            total += cantidad;
         }
 
-        assertEquals(256, histogram.length);
+        assertEquals(256, histograma.length);
         assertEquals(4, total);
-        assertEquals(2, histogram[0]);
-        assertEquals(1, histogram[255]);
+        assertEquals(2, histograma[0]);
+        assertEquals(1, histograma[255]);
     }
 }
