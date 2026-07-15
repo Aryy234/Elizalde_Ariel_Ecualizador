@@ -1,0 +1,62 @@
+.root {
+    -fx-font-family: "Segoe UI", Arial, sans-serif;
+    -fx-background-color: #eef2f6;
+}
+
+.top-bar {
+    -fx-background-color: white;
+    -fx-border-color: transparent transparent #d9e1e8 transparent;
+}
+
+.title {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #17324d;
+}
+
+.section-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #244b6b;
+}
+
+.side-panel {
+    -fx-background-color: white;
+    -fx-border-color: transparent #d9e1e8 transparent transparent;
+}
+
+.content-panel {
+    -fx-background-color: #eef2f6;
+}
+
+.image-container {
+    -fx-background-color: white;
+    -fx-border-color: #cbd5df;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+    -fx-padding: 12px;
+}
+
+.button {
+    -fx-background-color: #2474b5;
+    -fx-text-fill: white;
+    -fx-background-radius: 5px;
+    -fx-padding: 8px 14px;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: #195f98;
+}
+
+.button:disabled {
+    -fx-opacity: 0.45;
+}
+
+.chart-bar {
+    -fx-bar-fill: #2474b5;
+}
+
+.tab-pane {
+    -fx-background-color: white;
+}
