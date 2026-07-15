@@ -8,8 +8,6 @@ import javafx.scene.paint.Color;
 
 public class ImageProcessor {
 
-    private final HistogramAnalyzer histogramAnalyzer = new HistogramAnalyzer();
-
     public Image convertToGrayscale(Image image) {
         validateImage(image);
         int width = (int) image.getWidth();
@@ -32,9 +30,10 @@ public class ImageProcessor {
 
     public Image equalize(Image image) {
         validateImage(image);
-        Image grayImage = convertToGrayscale(image);
-        int[] histogram = histogramAnalyzer.calculateHistogram(grayImage);
-        int totalPixels = (int) (grayImage.getWidth() * grayImage.getHeight());
+        int width = (int) image.getWidth();
+        int height = (int) image.getHeight();
+        int totalPixels = width * height;
+        int[] histogram = calculateBrightnessHistogram(image);
 
         int[] cumulative = new int[256];
         cumulative[0] = histogram[0];
@@ -47,26 +46,46 @@ public class ImageProcessor {
             firstNonZero++;
         }
         if (firstNonZero == 256 || totalPixels == cumulative[firstNonZero]) {
-            return copyImage(grayImage);
+            return copyImage(image);
         }
 
-        int width = (int) grayImage.getWidth();
-        int height = (int) grayImage.getHeight();
-        PixelReader reader = grayImage.getPixelReader();
+        PixelReader reader = image.getPixelReader();
         WritableImage result = new WritableImage(width, height);
         PixelWriter writer = result.getPixelWriter();
         int minimumCumulative = cumulative[firstNonZero];
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                int oldValue = (int) Math.round(reader.getColor(x, y).getRed() * 255);
+                Color originalColor = reader.getColor(x, y);
+                int oldValue = (int) Math.round(originalColor.getBrightness() * 255);
                 double normalized = (double) (cumulative[oldValue] - minimumCumulative)
                         / (totalPixels - minimumCumulative);
                 double newValue = Math.max(0, Math.min(1, normalized));
-                writer.setColor(x, y, Color.gray(newValue));
+                Color equalizedColor = Color.hsb(
+                        originalColor.getHue(),
+                        originalColor.getSaturation(),
+                        newValue,
+                        originalColor.getOpacity()
+                );
+                writer.setColor(x, y, equalizedColor);
             }
         }
         return result;
+    }
+
+    private int[] calculateBrightnessHistogram(Image image) {
+        int[] histogram = new int[256];
+        PixelReader reader = image.getPixelReader();
+        int width = (int) image.getWidth();
+        int height = (int) image.getHeight();
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int brightness = (int) Math.round(reader.getColor(x, y).getBrightness() * 255);
+                histogram[brightness]++;
+            }
+        }
+        return histogram;
     }
 
     public Image applyIntensitySlice(Image image, int minimum, int maximum, boolean inverted) {
@@ -91,6 +110,35 @@ public class ImageProcessor {
             }
         }
         return result;
+    }
+
+    public Image adjustBrightness(Image image, int amount) {
+        validateImage(image);
+        if (amount < -100 || amount > 100) {
+            throw new IllegalArgumentException("El brillo debe estar entre -100 y 100.");
+        }
+
+        int width = (int) image.getWidth();
+        int height = (int) image.getHeight();
+        PixelReader reader = image.getPixelReader();
+        WritableImage result = new WritableImage(width, height);
+        PixelWriter writer = result.getPixelWriter();
+        double change = amount / 100.0;
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                Color color = reader.getColor(x, y);
+                double red = limitColor(color.getRed() + change);
+                double green = limitColor(color.getGreen() + change);
+                double blue = limitColor(color.getBlue() + change);
+                writer.setColor(x, y, new Color(red, green, blue, color.getOpacity()));
+            }
+        }
+        return result;
+    }
+
+    private double limitColor(double value) {
+        return Math.max(0, Math.min(1, value));
     }
 
     private Image copyImage(Image image) {

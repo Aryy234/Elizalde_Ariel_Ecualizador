@@ -53,8 +53,12 @@
     -fx-opacity: 0.45;
 }
 
-.chart-bar {
-    -fx-bar-fill: #2474b5;
+.chart-series-area-line {
+    -fx-stroke: #2474b5;
+}
+
+.chart-series-area-fill {
+    -fx-fill: rgba(36, 116, 181, 0.45);
 }
 
 .tab-pane {

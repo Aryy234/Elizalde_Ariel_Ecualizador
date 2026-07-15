@@ -4,7 +4,7 @@ import com.ecualizador.elizalde_ariel_ecualizador.histogramapp.model.HistogramAn
 import com.ecualizador.elizalde_ariel_ecualizador.histogramapp.model.ImageProcessor;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.fxml.FXML;
-import javafx.scene.chart.BarChart;
+import javafx.scene.chart.AreaChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -25,17 +25,20 @@ public class MainController {
     @FXML private Label viewLabel;
     @FXML private Label minimumValueLabel;
     @FXML private Label maximumValueLabel;
+    @FXML private Label brightnessValueLabel;
     @FXML private Slider minimumSlider;
     @FXML private Slider maximumSlider;
+    @FXML private Slider brightnessSlider;
     @FXML private CheckBox invertedCheckBox;
     @FXML private Button saveButton;
     @FXML private Button restoreButton;
     @FXML private Button grayscaleButton;
     @FXML private Button equalizeButton;
+    @FXML private Button brightnessButton;
     @FXML private Button sliceButton;
     @FXML private Button toggleViewButton;
-    @FXML private BarChart<String, Number> originalHistogramChart;
-    @FXML private BarChart<String, Number> processedHistogramChart;
+    @FXML private AreaChart<Number, Number> originalHistogramChart;
+    @FXML private AreaChart<Number, Number> processedHistogramChart;
 
     private final ImageProcessor imageProcessor = new ImageProcessor();
     private final HistogramAnalyzer histogramAnalyzer = new HistogramAnalyzer();
@@ -59,7 +62,10 @@ public class MainController {
             }
             updateSliderLabels();
         });
+        brightnessSlider.valueProperty().addListener((observable, oldValue, newValue) ->
+                updateBrightnessLabel());
         updateSliderLabels();
+        updateBrightnessLabel();
         setControlsDisabled(true);
         configureChart(originalHistogramChart);
         configureChart(processedHistogramChart);
@@ -85,6 +91,7 @@ public class MainController {
             originalImage = loadedImage;
             grayscaleImage = imageProcessor.convertToGrayscale(originalImage);
             processedImage = grayscaleImage;
+            brightnessSlider.setValue(0);
             showingOriginal = true;
             updateImageView();
             updateHistogram(originalHistogramChart, grayscaleImage);
@@ -103,7 +110,14 @@ public class MainController {
 
     @FXML
     private void equalizeImage() {
-        processedImage = imageProcessor.equalize(grayscaleImage);
+        processedImage = imageProcessor.equalize(originalImage);
+        showProcessedResult();
+    }
+
+    @FXML
+    private void adjustBrightness() {
+        int amount = (int) Math.round(brightnessSlider.getValue());
+        processedImage = imageProcessor.adjustBrightness(originalImage, amount);
         showProcessedResult();
     }
 
@@ -119,6 +133,7 @@ public class MainController {
     @FXML
     private void restoreImage() {
         processedImage = grayscaleImage;
+        brightnessSlider.setValue(0);
         showingOriginal = true;
         updateImageView();
         updateHistogram(processedHistogramChart, processedImage);
@@ -166,20 +181,20 @@ public class MainController {
         toggleViewButton.setText(showingOriginal ? "Ver procesada" : "Ver original");
     }
 
-    private void updateHistogram(BarChart<String, Number> chart, Image image) {
+    private void updateHistogram(AreaChart<Number, Number> chart, Image image) {
         int[] histogram = histogramAnalyzer.calculateHistogram(image);
-        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        XYChart.Series<Number, Number> series = new XYChart.Series<>();
         for (int intensity = 0; intensity < histogram.length; intensity++) {
-            series.getData().add(new XYChart.Data<>(String.valueOf(intensity), histogram[intensity]));
+            series.getData().add(new XYChart.Data<>(intensity, histogram[intensity]));
         }
-        chart.getData().setAll(series);
+        chart.getData().clear();
+        chart.getData().add(series);
     }
 
-    private void configureChart(BarChart<String, Number> chart) {
+    private void configureChart(AreaChart<Number, Number> chart) {
         chart.setAnimated(false);
         chart.setLegendVisible(false);
-        chart.setCategoryGap(0);
-        chart.setBarGap(0);
+        chart.setCreateSymbols(false);
     }
 
     private void updateSliderLabels() {
@@ -187,15 +202,22 @@ public class MainController {
         maximumValueLabel.setText(String.valueOf((int) Math.round(maximumSlider.getValue())));
     }
 
+    private void updateBrightnessLabel() {
+        int value = (int) Math.round(brightnessSlider.getValue());
+        brightnessValueLabel.setText(value > 0 ? "+" + value : String.valueOf(value));
+    }
+
     private void setControlsDisabled(boolean disabled) {
         saveButton.setDisable(disabled);
         restoreButton.setDisable(disabled);
         grayscaleButton.setDisable(disabled);
         equalizeButton.setDisable(disabled);
+        brightnessButton.setDisable(disabled);
         sliceButton.setDisable(disabled);
         toggleViewButton.setDisable(disabled);
         minimumSlider.setDisable(disabled);
         maximumSlider.setDisable(disabled);
+        brightnessSlider.setDisable(disabled);
         invertedCheckBox.setDisable(disabled);
     }
 
